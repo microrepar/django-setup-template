@@ -1,0 +1,41 @@
+[project]
+name = "django-setup-copier"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13,<4.0"
+dependencies = [
+    "celery>=5.6.3",
+    "dj-database-url>=3.1.2",
+    "django>=5.2,<6.0",
+    "django-htmx>=1.29.0",
+    "psycopg2-binary>=2.9.13",
+    "python-decouple>=3.8",
+    "redis>=8.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "django-extensions>=4.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-django>=4.14.0",
+    "ruff>=0.17.0",
+    "taskipy>=1.14.1",
+]
+
+[tool.taskipy.tasks]
+# Tasks via Docker - Funcionam em qualquer ambiente
+css-build = { cmd = "docker compose exec web tailwindcss -i /code/core/static/core/css/input.css -o /code/core/static/core/css/output.css --minify", help = "Build Tailwind CSS for production via Docker" }
+css-watch = { cmd = "docker compose exec web tailwindcss -i /code/core/static/core/css/input.css -o /code/core/static/core/css/output.css --watch", help = "Watch and rebuild Tailwind CSS via Docker" }
+css-dev = { cmd = "docker compose exec web tailwindcss -i /code/core/static/core/css/input.css -o /code/core/static/core/css/output.css", help = "Build Tailwind CSS for development via Docker" }
+test = { cmd = "docker compose run --rm test", help = "Roda o pytest no container dev (Postgres do Compose)" }
+
+[tool.ruff.lint.per-file-ignores]
+# Migracoes sao geradas pelo Django; dicts/lists de classe sao o formato dele.
+"**/migrations/*.py" = ["RUF012"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "core.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+norecursedirs = [".*", "*.egg", "build", "dist", "node_modules", "data", ".venv", "staticfiles", "media"]

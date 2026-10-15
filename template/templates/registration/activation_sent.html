@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirme seu e-mail - django-setup-copier{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-16">
+    <div class="card text-center">
+        <h1 class="text-2xl font-semibold mb-4">Confirme seu e-mail</h1>
+        <p class="text-gray-600 mb-2">
+            Enviamos um link de ativação para o endereço informado no cadastro.
+            Acesse-o para concluir a criação da sua conta.
+        </p>
+        <p class="text-gray-500 text-sm mb-6">
+            O link expira em algum tempo.
+        </p>
+        <a href="{% url 'login' %}" class="btn-primary">Voltar para entrar</a>
+    </div>
+</div>
+{% endblock %}

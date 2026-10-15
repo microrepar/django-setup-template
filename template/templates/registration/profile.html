@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}Meu perfil - django-setup-copier{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="card">
+        <h1 class="text-2xl font-semibold mb-6">Meu perfil</h1>
+
+        <dl class="space-y-4">
+            <div class="flex justify-between border-b border-gray-100 pb-2">
+                <dt class="font-medium text-gray-700">Nome</dt>
+                <dd class="text-gray-900">{{ user.get_full_name|default:'—' }}</dd>
+            </div>
+            <div class="flex justify-between border-b border-gray-100 pb-2">
+                <dt class="font-medium text-gray-700">E-mail</dt>
+                <dd class="text-gray-900">{{ user.email }}</dd>
+            </div>
+            <div class="flex justify-between border-b border-gray-100 pb-2">
+                <dt class="font-medium text-gray-700">Membro desde</dt>
+                <dd class="text-gray-900">{{ user.date_joined|date:'d/m/Y H:i' }}</dd>
+            </div>
+            <div class="flex justify-between border-b border-gray-100 pb-2">
+                <dt class="font-medium text-gray-700">Último acesso</dt>
+                <dd class="text-gray-900">{{ user.last_login|date:'d/m/Y H:i'|default:'—' }}</dd>
+            </div>
+            <div class="flex justify-between border-b border-gray-100 pb-2">
+                <dt class="font-medium text-gray-700">Membro de equipe</dt>
+                <dd class="text-gray-900">{{ user.is_staff|yesno:'Sim,Não' }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="font-medium text-gray-700">Superusuário</dt>
+                <dd class="text-gray-900">{{ user.is_superuser|yesno:'Sim,Não' }}</dd>
+            </div>
+        </dl>
+
+        <h2 class="text-lg font-semibold mt-8 mb-3">Permissões de acesso</h2>
+        {% if user.is_superuser %}
+            <p class="text-gray-900">
+                Acesso total ao sistema (superusuário), incluindo a
+                <a href="{% url 'admin:index' %}" class="text-blue-600 hover:underline">área administrativa</a>.
+            </p>
+        {% elif user.is_staff %}
+            <p class="text-gray-900">
+                Tudo o que a conta comum permite, e também a
+                <a href="{% url 'admin:index' %}" class="text-blue-600 hover:underline">área administrativa</a>.
+            </p>
+        {% else %}
+            <p class="text-gray-900">Com esta conta você pode:</p>
+            <ul class="list-disc list-inside text-gray-900 space-y-1 mt-2">
+                <li>entrar no sistema;</li>
+                <li>ver seus dados de cadastro no perfil;</li>
+                <li>alterar a sua própria senha.</li>
+            </ul>
+            <p class="text-gray-600 text-sm mt-2">
+                A área administrativa não está disponível para esta conta — se precisar, solicite a um administrador.
+            </p>
+        {% endif %}
+        {% if groups %}
+            <p class="text-gray-600 text-sm mt-2">Grupos: {{ groups|join:', ' }}</p>
+        {% endif %}
+        {% if permissions %}
+            <p class="text-gray-600 text-sm mt-1">Permissões: {{ permissions|join:', ' }}.</p>
+        {% endif %}
+
+        <div class="mt-8 flex space-x-4">
+            <a href="{% url 'password_change' %}" class="btn-secondary">Trocar senha</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

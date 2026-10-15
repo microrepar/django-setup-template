@@ -1,0 +1,25 @@
+[project]
+name = "django-setup-copier-template"
+version = "0.1.0"
+description = "Template Copier que gera cópias exatas da base django-setup-copier com identidade personalizada"
+readme = "README.md"
+requires-python = ">=3.13,<4.0"
+dependencies = [
+    "copier>=9.5.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.0",
+    "taskipy>=1.14.1",
+]
+
+[tool.taskipy.tasks]
+sync = { cmd = "python scripts/sync.py", help = "Copia o projeto base (../) para template/, aplicando as exclusões" }
+parity = { cmd = "python scripts/parity.py", help = "Valida o espelho contra o base + smoke de renderização (use --full para o pipeline completo)" }
+test = { cmd = "python scripts/parity.py", help = "Alias de parity: a paridade é o teste deste repo" }
+lint = { cmd = "ruff check .", help = "Lint do tooling (o espelho em template/ é responsabilidade do base)" }
+
+[tool.ruff]
+# template/ é espelho do base: código de outro domínio, lintado lá.
+extend-exclude = ["template"]

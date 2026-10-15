@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block title %}Ativação de conta - django-setup-copier{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-16">
+    <div class="card text-center">
+        {% if validlink %}
+            <h1 class="text-2xl font-semibold mb-4">E-mail confirmado</h1>
+            <p class="text-gray-600 mb-6">
+                Sua conta está ativa. Você já pode entrar.
+            </p>
+            <a href="{% url 'login' %}" class="btn-primary">Entrar</a>
+        {% else %}
+            <h1 class="text-2xl font-semibold mb-4">Link inválido</h1>
+            <p class="text-gray-600 mb-6">
+                O link de ativação é inválido ou expirou.
+            </p>
+            <a href="{% url 'signup' %}" class="btn-primary">Criar conta</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

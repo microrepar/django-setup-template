@@ -1,0 +1,50 @@
+# Template Copier do django-setup-copier.
+#
+# Arquitetura "espelho + task": o conteúdo em template/ é uma cópia
+# byte-a-byte do projeto base (ver scripts/sync.py) e TODA a personalização
+# acontece no task pós-cópia (scripts/personalize.py) — os templates Django
+# do projeto viajam intactos, sem blocos {% raw %}.
+
+_subdirectory: template
+_min_copier_version: "9.0.0"
+
+project_name:
+  type: str
+  help: Nome de exibição do projeto (navbar, títulos das páginas, README)
+
+project_slug:
+  type: str
+  help: Identificador técnico (nome no pyproject, network do Compose)
+  default: "{{ project_name|lower|replace(' ', '-')|replace('_', '-') }}"
+  validator: "{% if not (project_slug | regex_search('^[a-z][a-z0-9-]+$')) %}Use apenas letras minúsculas, dígitos e hífens (sem acentos nem espaços).{% endif %}"
+
+project_description:
+  type: str
+  help: Descrição de uma linha (pyproject e README)
+  default: ""
+
+author_name:
+  type: str
+  help: Nome do autor (pyproject e README)
+
+author_email:
+  type: str
+  help: E-mail do autor (opcional)
+  default: ""
+  validator: "{% if author_email and '@' not in author_email %}E-mail inválido.{% endif %}"
+
+# Ordem deliberada: personalize ANTES de uv sync/export — o uv.lock e os
+# comentários "# via" dos requirements nascem com o nome novo do projeto.
+# Os comandos uv são os mesmos declarados nos cabeçalhos dos requirements do
+# base. Falha de uv (ausente ou sem rede) vira aviso, não aborto: o resto do
+# projeto já está pronto e o README gerado documenta os comandos.
+_tasks:
+  - ["{{ _copier_python }}", "{{ _copier_conf.src_path }}/scripts/personalize.py",
+     "--name", "{{ project_name }}",
+     "--slug", "{{ project_slug }}",
+     "--description", "{{ project_description }}",
+     "--author", "{{ author_name }}",
+     "--email", "{{ author_email }}"]
+  - "uv sync || echo 'AVISO: uv sync falhou (uv ausente ou sem rede?) — rode manualmente; comandos no README'"
+  - "uv export --no-dev --no-hashes --output-file requirements.txt || echo 'AVISO: requirements.txt não gerado — comando no README'"
+  - "uv export --no-hashes --output-file requirements-dev.txt || echo 'AVISO: requirements-dev.txt não gerado — comando no README'"

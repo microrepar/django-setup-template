@@ -1,0 +1,49 @@
+# {{ project_name }}
+
+{{ project_description if project_description else "Projeto Django gerado da base django-setup-copier." }}
+
+Criado por **{{ author_name }}**{% if author_email %} (`{{ author_email }}`){% endif %}.
+Gerado a partir do template django-setup-copier em __DATA_GERACAO__.
+
+## Stack
+
+Django 5.2 · autenticação por e-mail com ativação de uso único · Celery + Redis ·
+Docker Compose (Postgres, nginx com rate limit, worker) · HTMX + Tailwind ·
+settings fail-fast de segurança (detalhes no `.docs/DJANGO-SETUP.md`).
+
+## Primeiros passos
+
+O `.env` já nasce pronto, com os secrets gerados na criação (`SECRET_KEY`,
+`POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `APPS_SCRIPT_TOKEN`, `DATABASE_URL` e
+`CELERY_BROKER_URL` compostos). Se algum task da geração falhou por rede ou
+ausência do uv, rode antes de tudo:
+
+    uv sync
+    uv export --no-dev --no-hashes --output-file requirements.txt
+    uv export --no-hashes --output-file requirements-dev.txt
+
+Suba o banco e o broker:
+
+    docker compose up -d db redis
+
+Migrações e superusuário:
+
+    uv run python manage.py migrate
+    uv run python manage.py createsuperuser
+
+Aplicação completa (acesso canônico pelo nginx em `localhost:8080`):
+
+    docker compose up
+
+Testes (pytest no container, Postgres do Compose):
+
+    uv run task test
+
+Guia completo — endurecimento de segurança, deploy, backends de e-mail — em
+`.docs/DJANGO-SETUP.md`.
+
+## Atualizando pela base
+
+Este projeto foi gerado por Copier: com o `.copier-answers.yml` commitado,
+`copier update` traz as evoluções do template (diff 3-way, conflitos resolvidos
+na mão quando houver edição local).
