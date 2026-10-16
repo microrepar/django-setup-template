@@ -110,10 +110,17 @@ def write_env(root: Path, name: str) -> None:
     env.write_text(''.join(filled), encoding='utf-8')
 
 
-def git_init(root: Path) -> None:
+def git_init(root: Path) -> bool:
+    """git init quando o repo nasce agora; existente é intocado.
+
+    O commit inicial é o ÚLTIMO task do copier.yml (após uv sync/export),
+    para o estado commitado incluir uv.lock e requirements — sem eles o
+    destino nasceria "dirty" e o `copier update` recusaria operar.
+    """
     if (root / '.git').exists():
-        return
+        return False
     subprocess.run(['git', 'init'], cwd=root, check=True, capture_output=True)
+    return True
 
 
 def main() -> None:
@@ -133,13 +140,12 @@ def main() -> None:
     stamp_readme(root)
     fix_env_example(root, args.name)
     env_existed = (root / '.env').exists()
-    git_existed = (root / '.git').exists()
     write_env(root, args.name)
-    git_init(root)
+    git_created = git_init(root)
 
     print(f'personalize: identidade aplicada ({args.name} / {args.slug})')
     print('personalize: .env ' + ('intocado — já existia' if env_existed else 'gerado com SECRET_KEY, POSTGRES_PASSWORD, REDIS_PASSWORD, APPS_SCRIPT_TOKEN e SITE_NAME'))
-    print('personalize: git ' + ('intocado — já existia' if git_existed else 'inicializado (sem commit — o primeiro é seu)'))
+    print('personalize: git ' + ('intocado — já existia' if not git_created else 'inicializado (commit inicial no task final)'))
 
 
 if __name__ == '__main__':

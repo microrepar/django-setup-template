@@ -124,6 +124,8 @@ def full_checks(proj: Path) -> list[str]:
         errors.append('.env.example sem SITE_NAME do projeto')
     if not (proj / '.git').exists():
         errors.append('git init não executado')
+    elif subprocess.run(['git', 'log', '-1'], cwd=proj, check=False, capture_output=True).returncode != 0:
+        errors.append('commit inicial ausente (copier update exigiria destino limpo)')
     for req in ('requirements.txt', 'requirements-dev.txt'):
         if not (proj / req).exists():
             errors.append(f'{req} não gerado pelo uv export')

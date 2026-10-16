@@ -48,3 +48,7 @@ _tasks:
   - "uv sync || echo 'AVISO: uv sync falhou (uv ausente ou sem rede?) — rode manualmente; comandos no README'"
   - "uv export --no-dev --no-hashes --output-file requirements.txt || echo 'AVISO: requirements.txt não gerado — comando no README'"
   - "uv export --no-hashes --output-file requirements-dev.txt || echo 'AVISO: requirements-dev.txt não gerado — comando no README'"
+  # Commit inicial por último, só se o repo acabou de nascer: o estado
+  # commitado inclui uv.lock e requirements (senão o destino nasce "dirty"
+  # e o copier update recusa operar). Em update, HEAD existe e o task é no-op.
+  - "git rev-parse HEAD >/dev/null 2>&1 || (git add -A && git commit -m 'chore: initial project' || echo 'AVISO: commit inicial falhou (git user configurado?) — commite manualmente antes de um copier update')"
