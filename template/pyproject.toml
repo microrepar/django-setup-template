@@ -35,7 +35,11 @@ test = { cmd = "docker compose run --rm test", help = "Roda o pytest no containe
 # Migracoes sao geradas pelo Django; dicts/lists de classe sao o formato dele.
 "**/migrations/*.py" = ["RUF012"]
 
+[tool.ruff]
+# Template Copier aninhado: repo próprio, código de outro domínio.
+extend-exclude = ["copier-template"]
+
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
-norecursedirs = [".*", "*.egg", "build", "dist", "node_modules", "data", ".venv", "staticfiles", "media"]
+norecursedirs = [".*", "*.egg", "build", "dist", "node_modules", "data", ".venv", "staticfiles", "media", "copier-template"]

@@ -110,11 +110,10 @@ Estas regras se aplicam a todas as tarefas neste projeto, a menos que o usuário
 
 ## Comandos do template (específicos deste repo)
 
-Este repo é o template Copier da base `django-setup-copier` (o diretório pai). Regras de operação:
+Este repo é **autônomo**: nada aqui sabe ou depende de qualquer projeto externo que o tenha originado.
 
-- **O base (`../`) é a fonte da verdade.** Features entram lá; chegam aqui por sync. Não edite arquivos de `template/` na mão (exceto `.copier-answers.yml.jinja` e `README.md.jinja`, autorais do template) — o próximo sync sobrescreve.
-- `uv run task sync` — copia o base para `template/`, aplicando as exclusões de `scripts/exclusions.py`.
-- `uv run task parity` — valida o espelho contra o base + smoke de renderização (`--full` roda o pipeline completo com tasks + `manage.py check` no gerado). **A paridade é o teste deste repo.**
-- `uv run task lint` — ruff do tooling (`template/` é lint do base, não daqui).
-- **Commit e tag (`vX.Y.Z`) a cada sync** — projetos gerados atualizam por `copier update`, que diffa entre as tags.
-- Ajustes nas exclusões ou nos tasks pertencem a `copier.yml`/`scripts/` (aqui); ajustes no conteúdo pertencem ao base.
+- `template/` é o conteúdo que o Copier gera — **edite diretamente aqui**; não há espelho nem sincronização com origem externa.
+- `scripts/personalize.py` é o task pós-cópia (primeira entrada de `_tasks` no `copier.yml`): toda a personalização (identidade, `.env` com secrets, `git init`) vive ali.
+- `uv run task check` — renderiza o template num diretório temporário e valida o resultado. `--full` executa o pipeline inteiro (tasks + `uv sync` + `manage.py check`). **É o teste deste repo.**
+- `uv run task lint` — ruff do tooling (`template/` é conteúdo do projeto gerado, lintado por ele).
+- Commit e tag (`vX.Y.Z`) a cada evolução — projetos gerados atualizam por `copier update`, que diffa entre as tags.

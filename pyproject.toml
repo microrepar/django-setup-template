@@ -1,7 +1,7 @@
 [project]
 name = "django-setup-copier-template"
-version = "0.1.0"
-description = "Template Copier que gera cópias exatas da base django-setup-copier com identidade personalizada"
+version = "0.2.0"
+description = "Template Copier de projeto Django: autenticação por e-mail com ativação de uso único, Celery + Redis, Docker Compose com nginx, HTMX + Tailwind e settings fail-fast"
 readme = "README.md"
 requires-python = ">=3.13,<4.0"
 dependencies = [
@@ -15,11 +15,11 @@ dev = [
 ]
 
 [tool.taskipy.tasks]
-sync = { cmd = "python scripts/sync.py", help = "Copia o projeto base (../) para template/, aplicando as exclusões" }
-parity = { cmd = "python scripts/parity.py", help = "Valida o espelho contra o base + smoke de renderização (use --full para o pipeline completo)" }
-test = { cmd = "python scripts/parity.py", help = "Alias de parity: a paridade é o teste deste repo" }
-lint = { cmd = "ruff check .", help = "Lint do tooling (o espelho em template/ é responsabilidade do base)" }
+check = { cmd = "python scripts/check.py", help = "Renderiza o template num diretório temporário e valida o resultado (--full: pipeline completo com tasks + manage.py check)" }
+test = { cmd = "python scripts/check.py", help = "Alias de check: a verificação é o teste deste repo" }
+lint = { cmd = "ruff check .", help = "Lint do tooling (template/ é conteúdo do projeto gerado, lintado por ele)" }
 
 [tool.ruff]
-# template/ é espelho do base: código de outro domínio, lintado lá.
+# template/ é o conteúdo que o Copier gera: pertence ao projeto gerado,
+# não ao tooling deste repo.
 extend-exclude = ["template"]
