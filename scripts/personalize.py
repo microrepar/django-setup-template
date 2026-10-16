@@ -1,9 +1,10 @@
 """Task pós-cópia do Copier: personaliza a identidade do projeto gerado.
 
-Arquitetura "espelho + task": o conteúdo chega byte-a-byte do base e TODA a
-personalização acontece aqui — os templates Django viajam sem Jinja e recebem
-a marca por replace textual contextual (mesma string-fonte, destinos
-distintos: exibição nos HTML, técnico no pyproject e no Compose).
+Arquitetura "espelho + task": o conteúdo chega byte-a-byte e a personalização
+acontece aqui. A marca de exibição NÃO é replace — os templates leem
+``{{ site_name }}`` em runtime (context processor + settings.SITE_NAME), e o
+task só preenche ``SITE_NAME`` no .env/.env.example. Replace textual resta
+para o técnico: slug no pyproject e na network do Compose.
 
 Idempotente por construção — seguro no `copier update`: o replace é no-op na
 segunda rodada (a string-fonte sumiu), `.env` e `git init` só quando
@@ -21,8 +22,7 @@ BASE_NETWORK = f'{BASE_NAME}_network'
 BASE_PYPROJECT_NAME = f'name = "{BASE_NAME}"'
 PLACEHOLDER_DESCRIPTION = 'Add your description here'
 README_DATE_MARKER = '__DATA_GERACAO__'
-# O rodapé do base.html usa a entidade HTML, não o caractere ©.
-FOOTER_YEAR = '&copy; 2026'
+BASE_SITE_NAME = f'SITE_NAME={BASE_NAME}'
 
 
 def replace_in(path: Path, old: str, new: str) -> None:
@@ -31,12 +31,9 @@ def replace_in(path: Path, old: str, new: str) -> None:
         path.write_text(text.replace(old, new), encoding='utf-8')
 
 
-def personalize_html(root: Path, name: str, year: int) -> None:
-    """Exibição: marca nos títulos, navbar e rodapé dos templates Django."""
-    for path in root.glob('templates/**/*.html'):
-        replace_in(path, BASE_NAME, name)
-    # O rodapé do base.html carimba o ano do snapshot; vira o ano da geração.
-    replace_in(root / 'templates' / 'base.html', FOOTER_YEAR, f'&copy; {year}')
+def fix_env_example(root: Path, name: str) -> None:
+    """O exemplo documenta ESTE projeto: SITE_NAME de fábrica vira o nome dado."""
+    replace_in(root / '.env.example', BASE_SITE_NAME, f'SITE_NAME={name}')
 
 
 def add_authors(pyproject: Path, author: str, email: str) -> None:
@@ -67,18 +64,25 @@ def personalize_compose(root: Path, slug: str) -> None:
     replace_in(root / 'docker-compose.yml', BASE_NETWORK, f'{slug}_network')
 
 
+def personalize_settings(root: Path, name: str) -> None:
+    """O default de SITE_NAME também vira o nome dado (fallback do .env ausente)."""
+    safe_name = name.replace("'", r"\'")
+    replace_in(root / 'core' / 'settings.py', f"default='{BASE_NAME}'", f"default='{safe_name}'")
+
+
 def stamp_readme(root: Path) -> None:
     today = datetime.date.today().strftime('%d/%m/%Y')
     replace_in(root / 'README.md', README_DATE_MARKER, today)
 
 
-def write_env(root: Path) -> None:
+def write_env(root: Path, name: str) -> None:
     """Gera o .env a partir do .env.example, preenchendo os 4 secrets.
 
     token_urlsafe não produz '$' (alfabeto A-Za-z0-9_-): os valores chegam
     inteiros tanto na interpolação do Compose quanto no python-decouple.
     DATABASE_URL e CELERY_BROKER_URL embutem as senhas geradas — os lados
-    Django e Postgres/Redis do .env precisam casar.
+    Django e Postgres/Redis do .env precisam casar. SITE_NAME preenche a
+    marca em runtime: é ela que os templates leem via context processor.
     """
     env = root / '.env'
     if env.exists():
@@ -91,6 +95,7 @@ def write_env(root: Path) -> None:
         'REDIS_PASSWORD=': f'REDIS_PASSWORD={redis}',
         'DATABASE_URL=': f'DATABASE_URL=postgres://postgres:{postgres}@db:5432/postgres',
         'CELERY_BROKER_URL=': f'CELERY_BROKER_URL=redis://:{redis}@redis:6379/0',
+        'SITE_NAME=': f'SITE_NAME={name}',
         '#APPS_SCRIPT_TOKEN=': 'APPS_SCRIPT_TOKEN=' + secrets.token_urlsafe(32),
     }
     lines = (root / '.env.example').read_text(encoding='utf-8').splitlines(keepends=True)
@@ -121,19 +126,19 @@ def main() -> None:
     args = parser.parse_args()
 
     root = Path.cwd()
-    year = datetime.date.today().year
 
-    personalize_html(root, args.name, year)
     personalize_pyproject(root, args.slug, args.description, args.author, args.email)
     personalize_compose(root, args.slug)
+    personalize_settings(root, args.name)
     stamp_readme(root)
+    fix_env_example(root, args.name)
     env_existed = (root / '.env').exists()
     git_existed = (root / '.git').exists()
-    write_env(root)
+    write_env(root, args.name)
     git_init(root)
 
     print(f'personalize: identidade aplicada ({args.name} / {args.slug})')
-    print('personalize: .env ' + ('intocado — já existia' if env_existed else 'gerado com SECRET_KEY, POSTGRES_PASSWORD, REDIS_PASSWORD e APPS_SCRIPT_TOKEN'))
+    print('personalize: .env ' + ('intocado — já existia' if env_existed else 'gerado com SECRET_KEY, POSTGRES_PASSWORD, REDIS_PASSWORD, APPS_SCRIPT_TOKEN e SITE_NAME'))
     print('personalize: git ' + ('intocado — já existia' if git_existed else 'inicializado (sem commit — o primeiro é seu)'))
 
 

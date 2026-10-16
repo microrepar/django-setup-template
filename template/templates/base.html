@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}django-setup-copier{% endblock %}</title>
+    <title>{% block title %}{{ site_name }}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'core/css/output.css' %}">
     <!-- HTMX: allowEval desligado (htmx não avalia JavaScript de atributos hx-*) -->
     <meta name="htmx-config" content='{"allowEval": false}'>
@@ -20,7 +20,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
                     <a href="{% url 'home' %}" class="text-2xl font-bold text-blue-600">
-                        django-setup-copier
+                        {{ site_name }}
                     </a>
                 </div>
                 <div class="flex items-center space-x-4">
@@ -60,7 +60,7 @@
     <!-- Footer -->
     <footer class="bg-gray-800 text-white py-6 mt-auto">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p>&copy; 2026 django-setup-copier. Todos os direitos reservados.</p>
+            <p>&copy; {% now "Y" %} {{ site_name }}. Todos os direitos reservados.</p>
         </div>
     </footer>
 

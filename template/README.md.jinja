@@ -1,6 +1,6 @@
 # {{ project_name }}
 
-{{ project_description if project_description else "Projeto Django gerado da base django-setup-copier." }}
+{{ project_description if project_description else "Projeto Django." }}
 
 Criado por **{{ author_name }}**{% if author_email %} (`{{ author_email }}`){% endif %} em __DATA_GERACAO__.
 
@@ -12,27 +12,33 @@ settings fail-fast de segurança (detalhes no `.docs/DJANGO-SETUP.md`).
 
 ## Primeiros passos
 
-O `.env` já nasce pronto, com os secrets gerados na criação (`SECRET_KEY`,
-`POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `APPS_SCRIPT_TOKEN`, `DATABASE_URL` e
-`CELERY_BROKER_URL` compostos). Se algum task da geração falhou por rede ou
-ausência do uv, rode antes de tudo:
+O `.env` já nasce pronto: os 4 secrets (`SECRET_KEY`, `POSTGRES_PASSWORD`,
+`REDIS_PASSWORD`, `APPS_SCRIPT_TOKEN`) gerados na criação, `DATABASE_URL` e
+`CELERY_BROKER_URL` compostos com as senhas, e `SITE_NAME` com o nome do
+projeto — **trocar a marca em todas as páginas é editar essa linha**. Se
+algum task da geração falhou por rede ou ausência do uv, rode antes de tudo:
 
     uv sync
     uv export --no-dev --no-hashes --output-file requirements.txt
     uv export --no-hashes --output-file requirements-dev.txt
 
-Suba o banco e o broker:
+Suba a pilha completa (Postgres, Redis, worker, web e nginx — acesso canônico
+pelo nginx em `localhost:8080`):
 
-    docker compose up -d db redis
+    docker compose up -d
 
-Migrações e superusuário:
+Migrações e superusuário (dentro da rede do Compose, onde o host `db` resolve):
 
-    uv run python manage.py migrate
-    uv run python manage.py createsuperuser
+    docker compose exec web python manage.py migrate
+    docker compose exec web python manage.py createsuperuser
 
-Aplicação completa (acesso canônico pelo nginx em `localhost:8080`):
+Os e-mails de cadastro/reset são consumidos pelo worker — acompanhe por:
 
-    docker compose up
+    docker compose logs -f worker
+
+Para rodar um runserver nu, sem container: esvazie `CELERY_BROKER_URL` no
+`.env` — as tarefas executam eager (na hora, dentro da própria requisição) e
+o backend de console imprime no terminal.
 
 Testes (pytest no container, Postgres do Compose):
 
@@ -41,8 +47,7 @@ Testes (pytest no container, Postgres do Compose):
 Guia completo — endurecimento de segurança, deploy, backends de e-mail — em
 `.docs/DJANGO-SETUP.md`.
 
-## Atualizando pela base
+## Atualizando pelo template
 
-Este projeto foi gerado por Copier: com o `.copier-answers.yml` commitado,
-`copier update` traz as evoluções do template (diff 3-way, conflitos resolvidos
-na mão quando houver edição local).
+Com o `.copier-answers.yml` commitado, `copier update` traz as evoluções do
+template (diff 3-way; conflitos resolvidos na mão quando houver edição local).

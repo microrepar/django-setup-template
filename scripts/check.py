@@ -9,7 +9,6 @@ cada promessa do pipeline — identidade aplicada, .env com secrets, git init,
 requirements gerados — terminando com `manage.py check` no projeto gerado.
 """
 
-import datetime
 import shutil
 import subprocess
 import sys
@@ -85,10 +84,12 @@ def fast_checks(proj: Path) -> list[str]:
     # Sem tasks, o marcador fica cru: quem carimba a data é o personalize.py.
     if '__DATA_GERACAO__' not in readme:
         errors.append('README sem o marcador de data (deveria estar cru, sem tasks)')
-    # Sem tasks, nada deveria mudar: a marca de fábrica ainda está nos HTML.
+    # A marca é runtime: o HTML carrega a tag, não nome cravado.
     base_html = (proj / 'templates' / 'base.html').read_text(encoding='utf-8')
-    if 'django-setup-copier' not in base_html:
-        errors.append('base.html não está intacto (sem tasks, nada deveria mudar)')
+    if '{{ site_name }}' not in base_html:
+        errors.append('base.html sem a tag de marca ({{ site_name }})')
+    if 'django-setup-copier' in base_html:
+        errors.append('base.html com a marca de fábrica cravada')
     if (proj / '.env').exists() or (proj / '.git').exists():
         errors.append('.env/.git presentes mesmo com --skip-tasks')
     return errors
@@ -97,13 +98,6 @@ def fast_checks(proj: Path) -> list[str]:
 def full_checks(proj: Path) -> list[str]:
     """Pipeline completo: identidade aplicada, secrets, bootstrap."""
     errors = leaked_traces(proj)
-    base_html = (proj / 'templates' / 'base.html').read_text(encoding='utf-8')
-    if NAME not in base_html:
-        errors.append('nome de exibição ausente em templates/base.html')
-    # Nota: no ano do snapshot (2026) esta checagem passa trivialmente — o
-    # replace é no-op; ela passa a provar algo a partir de 2027.
-    if f'&copy; {datetime.date.today().year}' not in base_html:
-        errors.append('ano corrente ausente no rodapé do base.html')
     pyproject = (proj / 'pyproject.toml').read_text(encoding='utf-8')
     if f'name = "{SLUG}"' not in pyproject:
         errors.append('slug ausente no pyproject')
@@ -124,6 +118,10 @@ def full_checks(proj: Path) -> list[str]:
         for prefix in wanted:
             if not any(line.startswith(prefix) and len(line) > len(prefix) for line in text.splitlines()):
                 errors.append(f'.env sem valor preenchido: {prefix}...')
+        if f'SITE_NAME={NAME}' not in text.splitlines():
+            errors.append('.env sem SITE_NAME do projeto (marca em runtime)')
+    if f'SITE_NAME={NAME}' not in (proj / '.env.example').read_text(encoding='utf-8'):
+        errors.append('.env.example sem SITE_NAME do projeto')
     if not (proj / '.git').exists():
         errors.append('git init não executado')
     for req in ('requirements.txt', 'requirements-dev.txt'):

@@ -101,6 +101,11 @@ if any(not origin.startswith(('http://', 'https://')) for origin in CSRF_TRUSTED
         "CSRF_TRUSTED_ORIGINS exige o esquema (http:// ou https://) em cada origem."
     )
 
+# Nome de exibição do projeto (navbar, títulos, rodapé) — chega aos templates
+# pelo context processor shared.context_processors.site_name. Trocar aqui (ou
+# no .env) re-marca todas as páginas, sem tocar em HTML.
+SITE_NAME = config('SITE_NAME', default='django-setup-copier')
+
 # SECURITY: transporte e cookies por ambiente. Em producao (DEBUG=False) as flags
 # abaixo sao OBRIGATORIAS - o startup falha se estiverem desligadas.
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', cast=bool, default=False)
@@ -172,6 +177,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'shared.context_processors.site_name',
             ],
         },
     },
