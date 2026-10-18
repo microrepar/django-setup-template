@@ -17,7 +17,8 @@ class PasswordResetFlowTestCase(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            'Usuario@Exemplo.com', OLD_PASSWORD, first_name='Usuário', last_name='de Teste'
+            'Usuario@Exemplo.com', OLD_PASSWORD, first_name='Usuário', last_name='de Teste',
+            email_verified=True,
         )
 
     @staticmethod
@@ -85,7 +86,12 @@ class PasswordResetFlowTestCase(TestCase):
         self.user.refresh_from_db()
         self.assertFalse(self.user.check_password(OLD_PASSWORD))
         self.assertTrue(self.user.check_password(NEW_PASSWORD))
-        self.assertTrue(self.client.login(email='usuario@exemplo.com', password=NEW_PASSWORD))
+        # POST no formulário (request real): a nova senha autentica pelo
+        # mesmo caminho que o usuário usa
+        response = self.client.post(
+            reverse('login'), {'username': 'usuario@exemplo.com', 'password': NEW_PASSWORD}
+        )
+        self.assertRedirects(response, reverse('home'))
 
     def test_unknown_email_does_not_reveal_registered_accounts(self):
         # Mesma resposta de sucesso, nenhum e-mail enviado.

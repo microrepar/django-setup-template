@@ -14,10 +14,12 @@ class AdminAccessMessageTestCase(TestCase):
     """
 
     def test_authenticated_non_staff_sees_denial_message(self):
-        User.objects.create_user(
+        user = User.objects.create_user(
             'semstaff@exemplo.com', 'senha-forte-123', email_verified=True
         )
-        self.client.login(email='semstaff@exemplo.com', password='senha-forte-123')
+        # force_login: o alvo do teste é a página, não a autenticação — e o
+        # login via client.login não trafega request, que o axes exige
+        self.client.force_login(user)
 
         response = self.client.get('/admin/login/?next=/admin/')
 

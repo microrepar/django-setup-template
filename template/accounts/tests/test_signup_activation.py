@@ -92,9 +92,13 @@ class SignupActivationFlowTestCase(TestCase):
         self.client.post(reverse('signup'), SIGNUP_DATA)
         match = re.search(r'/accounts/activate/[^/]+/[^/\s]+/', mail.outbox[0].body)
         self.client.get(match.group(0))  # ativa
-        self.assertTrue(
-            self.client.login(email='novo@exemplo.com', password=SIGNUP_DATA['password1'])
+        # credenciais recém-ativadas autenticam de verdade (POST no
+        # formulário: request real, o mesmo camho do usuário)
+        response = self.client.post(
+            reverse('login'),
+            {'username': 'novo@exemplo.com', 'password': SIGNUP_DATA['password1']},
         )
+        self.assertRedirects(response, reverse('home'))
 
         # token NOVO segue válido depois do login; o link usado, não
         user = User.objects.get(email='novo@exemplo.com')

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>429 — Conta Bloqueada</title>
+    <style>
+        *, *:before, *:after {
+            box-sizing: border-box;
+        }
+        html {
+            height: 100%;
+        }
+        body {
+            font-family: sans-serif;
+            background-color: #f2f2f2;
+            height: 100%;
+            padding: 10px;
+        }
+        a {
+            color: #494949;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #6b6b6b;
+            text-decoration: none;
+        }
+        .text-wrapper {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .title {
+            font-size: 5em;
+            font-weight: 700;
+            color: #494949;
+            text-align: center;
+        }
+        .subtitle {
+            font-size: 40px;
+            font-weight: 700;
+            color: #6b6b6b;
+            text-align: center;
+        }
+        .isi {
+            font-size: 18px;
+            text-align: center;
+            margin: 30px;
+            padding: 20px;
+            color: #494949;
+            max-width: 600px;
+        }
+        .button {
+            margin-top: 30px;
+            font-weight: 700;
+            border: 2px solid #494949;
+            padding: 15px;
+            text-transform: uppercase;
+            color: #494949;
+            border-radius: 26px;
+            transition: all 0.2s ease-in-out;
+            display: inline-block;
+        }
+        .button:hover {
+            background-color: #494949;
+            color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="text-wrapper">
+        <div class="title">
+            429 - CONTA BLOQUEADA
+        </div>
+        <div class="subtitle">
+            Muitas tentativas de login
+        </div>
+        <div class="isi">
+            Detectamos múltiplas tentativas de login falhas. Por motivos de segurança,
+            o acesso foi temporariamente bloqueado.
+            <br><br>
+            Aguarde 1 hora antes de tentar novamente.
+        </div>
+        <a class="button" href="/">Página Inicial</a>
+    </div>
+</body>
+</html>

@@ -12,8 +12,10 @@ class ProfilePermissionsTestCase(TestCase):
     """O perfil informa apenas o que a conta pode fazer — nunca o catálogo do sistema."""
 
     def profile_as(self, email, **user_kwargs):
-        User.objects.create_user(email, PASSWORD, email_verified=True, **user_kwargs)
-        self.client.login(email=email, password=PASSWORD)
+        user = User.objects.create_user(email, PASSWORD, email_verified=True, **user_kwargs)
+        # force_login: o alvo do teste é a página, não a autenticação — e o
+        # login via client.login não trafega request, que o axes exige
+        self.client.force_login(user)
         return self.client.get(reverse('profile'))
 
     def test_common_user_sees_what_the_account_can_do(self):
@@ -36,8 +38,9 @@ class ProfilePermissionsTestCase(TestCase):
         self.assertContains(response, '>Não<', 1)
 
     def test_superuser_sees_full_access_without_catalog(self):
-        User.objects.create_superuser('chefe@exemplo.com', PASSWORD)
-        self.client.login(email='chefe@exemplo.com', password=PASSWORD)
+        chefe = User.objects.create_superuser('chefe@exemplo.com', PASSWORD)
+        # force_login: idem profile_as — autenticação não é o alvo do teste
+        self.client.force_login(chefe)
 
         response = self.client.get(reverse('profile'))
 
@@ -52,7 +55,8 @@ class ProfilePermissionsTestCase(TestCase):
         group.permissions.add(Permission.objects.get(codename='view_user'))
         user = User.objects.create_user('editor@exemplo.com', PASSWORD, email_verified=True)
         user.groups.add(group)
-        self.client.login(email='editor@exemplo.com', password=PASSWORD)
+        # force_login: idem profile_as — autenticação não é o alvo do teste
+        self.client.force_login(user)
 
         response = self.client.get(reverse('profile'))
 

@@ -143,6 +143,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'axes',
     'django_htmx',
     'shared',
     'accounts',
@@ -154,6 +155,46 @@ AUTH_USER_MODEL = 'accounts.User'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
 
+# Backends de autenticação: o AxesStandaloneBackend precisa vir em primeiro
+# lugar para contar as tentativas antes do ModelBackend decidir o login.
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# Bloqueio de força bruta no login (django-axes): 5 tentativas falhas do
+# mesmo IP travam o acesso por 1 hora. O lockout responde 429 renderizando
+# templates/axes/errors/429.html (o nginx NÃO mapeia 429 em error_page,
+# então a página passa intacta pelo proxy_intercept_errors).
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # horas de bloqueio após exceder o limite
+
+# URLs monitoradas como tentativa de login (app e admin).
+AXES_LOGIN_URLS = [
+    '/accounts/login/',
+    '/admin/login/',
+]
+
+AXES_LOCKOUT_TEMPLATE = 'axes/errors/429.html'
+
+# O IP do cliente é resolvido por uma fonte única (get_client_ip em
+# shared.utils), consumida pelo axes via AXES_CLIENT_IP_CALLABLE.
+AXES_CLIENT_IP_CALLABLE = 'shared.utils.get_client_ip'
+
+# Proxy confiável: fora dele, X-Forwarded-For é forjável pelo cliente e
+# burla o bloqueio de brute-force (o get_client_ip usa só REMOTE_ADDR).
+# TRUST_PROXY=True SOMENTE quando o Django estiver atrás do nginx;
+# TRUSTED_PROXY_DEPTH = quantos proxies confiáveis antecedem o nginx
+# (0 = direto ao nginx; 1 = proxy externo — Apache, Cloudflare etc. — na
+# frente do nginx quando a aplicação é exposta à internet);
+# TRUSTED_PROXY_NET (opcional) = CIDR dos proxies imediatos (ex.: a rede
+# interna do Compose): REMOTE_ADDR fora do CIDR descarta o X-Forwarded-For.
+# ATRAS DO NGINX SEM TRUST_PROXY=True TODO MUNDO COMPARTILHA O IP DO
+# CONTAINER NGINX: 5 FALHAS DE QUALQUER UM BLOQUEIAM TODOS POR 1 HORA.
+TRUST_PROXY = config('TRUST_PROXY', cast=bool, default=False)
+TRUSTED_PROXY_DEPTH = config('TRUSTED_PROXY_DEPTH', cast=int, default=0)
+TRUSTED_PROXY_NET = config('TRUSTED_PROXY_NET', default='')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -163,6 +204,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
+    # Por último: converte o PermissionDenied do AxesStandaloneBackend na
+    # resposta 429 com o template de lockout.
+    'axes.middleware.AxesMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
