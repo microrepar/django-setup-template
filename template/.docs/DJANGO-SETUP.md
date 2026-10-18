@@ -1,7 +1,5 @@
 # Guia de Configuração do Projeto Django com Docker e Docker Compose
 
-> **Versão 1.1** (2026-10-15) — porta canônica do Nginx (`8080`) publicada em todas as interfaces; `DEBUG=True` passa a aceitar IPs de redes privadas/VPN (Tailscale), mantendo a recusa a hosts públicos.
-
 Guia completo para configurar um projeto Django com modelo de Usuário customizado, gerenciamento de dependências com uv, infraestrutura Docker, Tailwind CSS v4 e HTMX.
 
 **Este documento é a especificação.** Cada arquivo aparece **uma única vez**, já em seu estado final, e existe **um único runbook de execução** (seção [EXECUÇÃO OBRIGATÓRIA](#execução-obrigatória-do-projeto)).
@@ -1114,7 +1112,7 @@ networks:
 
 - `env_file: .env` é a **única** fonte de variáveis de ambiente das aplicações (Regra 2). O Compose também usa esse mesmo `.env` para interpolar `${DB_NAME}`, `${DB_USERNAME}` e `${DB_PASS}` no serviço `db`.
 - **Sem o arquivo `.env` o Compose aborta** com `env file .env not found`; com o bloco `DB_*` ausente/comentado, o serviço `db` falha com `Database is uninitialized and superuser password is not specified`. Por isso o passo [Criar o .env local](#2-criar-e-preencher-o-env-local) é obrigatório antes de qualquer `docker compose`.
-- `./staticfiles/errors` é montado em `/etc/nginx/errors` para as páginas de erro do Nginx (o `nginx.conf` deste guia mantém esses `error_page` comentados; o diretório fica vazio e disponível).
+- `./staticfiles/errors` é montado em `/etc/nginx/errors` para as páginas de erro do Nginx: os HTML criados em `core/static/errors/` (seção 5) chegam lá pelo `collectstatic` da FASE 2; o `location /errors/` do `nginx.conf` é `internal`, então as páginas não são acessíveis diretamente pela URL.
 - **Portas**: `5432` e `8000` publicadas apenas em `127.0.0.1`; a porta canônica do Nginx (`8080`) é publicada em todas as interfaces (acesso pela rede). O acesso entre containers acontece pela rede interna (`web:8000`, `db:5432`, `redis:6379`), então nada disso depende da porta publicada no host.
 - **Imagens por digest**: `postgres`, `redis` e `nginx` estão fixados por digest sha256. Trocar a versão exige atualizar tag **e** digest de forma consciente.
 - **Redis com senha**: `${REDIS_PASSWORD}` vem do `.env`; o `CELERY_BROKER_URL` gerado no passo 2 já inclui essa senha.
@@ -1148,14 +1146,22 @@ server {
 
     # client_max_body_size 50M;
 
-    # error_page 400 401 402 /errors/400.html;
-    # error_page 403 /errors/403.html;
-    # error_page 404 /errors/404.html;
-    # error_page 500 502 503 504 /errors/500.html;
+    # Páginas de erro customizadas: HTML servidos de /etc/nginx/errors/ (bind mount
+    # de staticfiles/errors/, populado pelo collectstatic a partir de core/static/errors/).
+    error_page 400 401 402 /errors/400.html;
+    error_page 403 /errors/403.html;
+    error_page 404 /errors/404.html;
+    error_page 500 502 503 504 /errors/500.html;
 
     location / {
+        # Respostas 4xx/5xx do Django são substituídas pelas error_page acima —
+        # sem isso, o mapeamento só valeria para erros gerados pelo próprio nginx.
+        proxy_intercept_errors on;
         proxy_pass http://web:8000;
-        proxy_set_header Host $host;
+        # $http_host preserva a porta ($host a descarta): sem ela, links
+        # gerados pelo Django (ativação/reset de senha) nascem sem a porta
+        # e morrem em dev, onde o acesso canônico é localhost:8080.
+        proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -1168,7 +1174,7 @@ server {
         limit_req zone=auth_limit burst=5 nodelay;
 
         proxy_pass http://web:8000;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;  # porta preservada, ver location /
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -1185,6 +1191,13 @@ server {
         internal;
         alias /code/media/;
     }
+
+    # Páginas de erro das diretivas error_page. `internal` impede o acesso
+    # direto a /errors/<arquivo> pela URL — só o próprio nginx as serve.
+    location /errors/ {
+        alias /etc/nginx/errors/;
+        internal;
+    }
 }
 ```
 
@@ -1194,6 +1207,330 @@ server {
 - ⚠️ **IP de origem atrás do Docker**: publicando a porta com o `docker-proxy`, o `$binary_remote_addr` visto pelo container pode ser o IP do gateway (todos os clientes contam no mesmo balde). Em produção, coloque o nginx atrás do balanceador real e configure `set_real_ip_from`/`real_ip_header X-Forwarded-For` para limitar por IP verdadeiro.
 - **Headers**: `X-Content-Type-Options`, `Referrer-Policy` e `X-Frame-Options` são enviados em todas as respostas. O Django também envia `X-Frame-Options: DENY` (middleware de clickjacking); o header do nginx cobre os arquivos servidos por `alias`.
 - **`/media/` internal**: o acesso direto à URL de um arquivo enviado é recusado pelo nginx. A autorização passa a ser obrigatória na aplicação (view autenticada + `X-Accel-Redirect`).
+- **Páginas de erro customizadas**: `error_page` mapeia 400/401/402→`400.html`, 403→`403.html`, 404→`404.html` e 500/502/503/504→`500.html`, servidas de `/etc/nginx/errors/` (bind mount de `staticfiles/errors/`, populado pelo `collectstatic`). O `proxy_intercept_errors on` faz o nginx substituir também as respostas 4xx/5xx **vindas do Django** pelas páginas estáticas — o custo é perder qualquer contexto renderizado pelo framework no erro. O 429 do `limit_req` não tem página customizada e usa a página padrão do nginx.
+- **`/errors/` internal**: as páginas não são acessíveis diretamente pela URL (`/errors/404.html` retorna 404); só o próprio nginx as serve via `error_page`.
+
+**Páginas de erro do Nginx** — crie os quatro HTML em `core/static/errors/`. São arquivos autônomos (CSS inline, sem `base.html`/Tailwind): precisam renderizar mesmo com o Django fora do ar, inclusive no 502. O `collectstatic` da FASE 2 os copia para `staticfiles/errors/`, montado em `/etc/nginx/errors`.
+
+`core/static/errors/400.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>400 — Requisição Inválida</title>
+    <style>
+        *, *:before, *:after {
+            box-sizing: border-box;
+        }
+        html {
+            height: 100%;
+        }
+        body {
+            font-family: sans-serif;
+            background-color: #f2f2f2;
+            height: 100%;
+            padding: 10px;
+        }
+        a {
+            color: #494949;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #6b6b6b;
+            text-decoration: none;
+        }
+        .text-wrapper {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .title {
+            font-size: 5em;
+            font-weight: 700;
+            color: #494949;
+            text-align: center;
+        }
+        .subtitle {
+            font-size: 40px;
+            font-weight: 700;
+            color: #6b6b6b;
+            text-align: center;
+        }
+        .button {
+            margin-top: 30px;
+            font-weight: 700;
+            border: 2px solid #494949;
+            padding: 15px;
+            text-transform: uppercase;
+            color: #494949;
+            border-radius: 26px;
+            transition: all 0.2s ease-in-out;
+            display: inline-block;
+        }
+        .button:hover {
+            background-color: #494949;
+            color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="text-wrapper">
+        <div class="title">
+            400 - BAD REQUEST
+        </div>
+        <div class="subtitle">
+            Oops, Requisição inválida.
+        </div>
+        <a class="button" href="/">Página Inicial</a>
+    </div>
+</body>
+</html>
+```
+
+`core/static/errors/403.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>403 — Acesso Negado</title>
+    <style>
+        *, *:before, *:after {
+            box-sizing: border-box;
+        }
+        html {
+            height: 100%;
+        }
+        body {
+            font-family: sans-serif;
+            background-color: #f2f2f2;
+            height: 100%;
+            padding: 10px;
+        }
+        a {
+            color: #494949;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #6b6b6b;
+            text-decoration: none;
+        }
+        .text-wrapper {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .title {
+            font-size: 5em;
+            font-weight: 700;
+            color: #494949;
+            text-align: center;
+        }
+        .subtitle {
+            font-size: 40px;
+            font-weight: 700;
+            color: #6b6b6b;
+            text-align: center;
+        }
+        .button {
+            margin-top: 30px;
+            font-weight: 700;
+            border: 2px solid #494949;
+            padding: 15px;
+            text-transform: uppercase;
+            color: #494949;
+            border-radius: 26px;
+            transition: all 0.2s ease-in-out;
+            display: inline-block;
+        }
+        .button:hover {
+            background-color: #494949;
+            color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="text-wrapper">
+        <div class="title">
+            403 - FORBIDDEN
+        </div>
+        <div class="subtitle">
+            Oops, Acesso negado.
+        </div>
+        <a class="button" href="/">Página Inicial</a>
+    </div>
+</body>
+</html>
+```
+
+`core/static/errors/404.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 — Não Encontrado</title>
+    <style>
+        *, *:before, *:after {
+            box-sizing: border-box;
+        }
+        html {
+            height: 100%;
+        }
+        body {
+            font-family: sans-serif;
+            background-color: #f2f2f2;
+            height: 100%;
+            padding: 10px;
+        }
+        a {
+            color: #494949;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #6b6b6b;
+            text-decoration: none;
+        }
+        .text-wrapper {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .title {
+            font-size: 5em;
+            font-weight: 700;
+            color: #494949;
+            text-align: center;
+        }
+        .subtitle {
+            font-size: 40px;
+            font-weight: 700;
+            color: #6b6b6b;
+            text-align: center;
+        }
+        .button {
+            margin-top: 30px;
+            font-weight: 700;
+            border: 2px solid #494949;
+            padding: 15px;
+            text-transform: uppercase;
+            color: #494949;
+            border-radius: 26px;
+            transition: all 0.2s ease-in-out;
+            display: inline-block;
+        }
+        .button:hover {
+            background-color: #494949;
+            color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="text-wrapper">
+        <div class="title">
+            404 - NOT FOUND
+        </div>
+        <div class="subtitle">
+            Oops, Recurso não encontrado.
+        </div>
+        <a class="button" href="/">Página Inicial</a>
+    </div>
+</body>
+</html>
+```
+
+`core/static/errors/500.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>500 — Erro Interno do Servidor</title>
+    <style>
+        *, *:before, *:after {
+            box-sizing: border-box;
+        }
+        html {
+            height: 100%;
+        }
+        body {
+            font-family: sans-serif;
+            background-color: #f2f2f2;
+            height: 100%;
+            padding: 10px;
+        }
+        a {
+            color: #494949;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #6b6b6b;
+            text-decoration: none;
+        }
+        .text-wrapper {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .title {
+            font-size: 5em;
+            font-weight: 700;
+            color: #494949;
+            text-align: center;
+        }
+        .subtitle {
+            font-size: 40px;
+            font-weight: 700;
+            color: #6b6b6b;
+            text-align: center;
+        }
+        .button {
+            margin-top: 30px;
+            font-weight: 700;
+            border: 2px solid #494949;
+            padding: 15px;
+            text-transform: uppercase;
+            color: #494949;
+            border-radius: 26px;
+            transition: all 0.2s ease-in-out;
+            display: inline-block;
+        }
+        .button:hover {
+            background-color: #494949;
+            color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="text-wrapper">
+        <div class="title">
+            500 - INTERNAL SERVER ERROR
+        </div>
+        <div class="subtitle">
+            Oops, Erro interno do servidor.
+        </div>
+        <a class="button" href="/">Página Inicial</a>
+    </div>
+</body>
+</html>
+```
 
 ### 6. Exportar Requisitos
 
@@ -1657,6 +1994,7 @@ Confira que cada artefato das seções 4 a 9 existe antes de seguir para a FASE 
 - [ ] `data/`, `media/`, `staticfiles/`, `staticfiles/errors/` criados
 - [ ] `requirements.txt` exportado **sem hashes** (`uv lock` + `uv export --no-dev --no-hashes`)
 - [ ] `core/static/core/css/input.css` e `core/static/core/js/htmx/htmx.min.js`
+- [ ] `core/static/errors/{400,403,404,500}.html` (páginas de erro do Nginx)
 - [ ] `templates/base.html`, `templates/home.html`, `templates/registration/login.html`
 - [ ] `core/views.py`, `core/urls.py`, `core/celery.py`, `core/__init__.py`
 
@@ -1867,13 +2205,18 @@ git add -A && git commit -m "feat: initial commit"
 │   ├── celery.py               # Configuração Celery
 │   ├── base_models/            # Mixins e modelo base abstrato
 │   └── static/                 # Arquivos estáticos (inclui Tailwind e HTMX)
-│       └── core/
-│           ├── css/
-│           │   ├── input.css
-│           │   └── output.css  # Gerado por `uv run task css-build` (não versionado)
-│           └── js/
-│               └── htmx/
-│                   └── htmx.min.js
+│       ├── core/
+│       │   ├── css/
+│       │   │   ├── input.css
+│       │   │   └── output.css  # Gerado por `uv run task css-build` (não versionado)
+│       │   └── js/
+│       │       └── htmx/
+│       │           └── htmx.min.js
+│       └── errors/             # Páginas de erro do Nginx (servidas de /etc/nginx/errors)
+│           ├── 400.html
+│           ├── 403.html
+│           ├── 404.html
+│           └── 500.html
 ├── templates/                  # Templates Django
 │   ├── base.html
 │   ├── home.html
@@ -1890,7 +2233,7 @@ git add -A && git commit -m "feat: initial commit"
 ├── data/                       # Dados do PostgreSQL (Docker) - ignorado no git
 ├── media/                      # Uploads de usuários
 ├── staticfiles/                # Arquivos estáticos coletados - ignorado no git
-│   └── errors/                 # Montado em /etc/nginx/errors
+│   └── errors/                 # Populado pelo collectstatic (core/static/errors/); montado em /etc/nginx/errors
 ├── .env                        # Variáveis de ambiente — segredos gerados, modo 600 (NÃO commitar!)
 ├── .superuser-password         # TEMPORÁRIO (FASE 2): senha gerada do superusuário; modo 600, ignorado pelo git, apagar ao final
 ├── .env.example                # Template de variáveis de ambiente (COMMITAR)
@@ -2410,8 +2753,8 @@ Em produção, atrás de balanceador, configure `set_real_ip_from`/`real_ip_head
 
 ---
 
-**Última Atualização**: 2026-10-08
-**Versão do Guia**: 0.5.0
+**Última Atualização**: 2026-10-16
+**Versão do Guia**: 0.6.0
 **Versão Django**: 5.2.x (LTS)
 **Versão Python**: 3.13
 **Versão HTMX**: 2.0.9
@@ -2422,6 +2765,7 @@ Em produção, atrás de balanceador, configure `set_real_ip_from`/`real_ip_head
 
 | Versão | Data | Mudanças |
 |---|---|---|
+| 0.6.0 | 2026-10-16 | 1. Páginas de erro customizadas do Nginx ativadas (`error_page` 400/401/402→400.html, 403, 404, 500/502/503/504→500.html) com `proxy_intercept_errors on` e `location /errors/` interno; HTML autônomos em `core/static/errors/`, entregues ao nginx pelo `collectstatic` (bind mount `staticfiles/errors:/etc/nginx/errors`). 2. Listing do `nginx.conf` sincronizado com o arquivo real (`Host $http_host` com preservação de porta nos dois `location` de proxy). 3. Banner de versão do topo removido — o rodapé + histórico de revisões volta a ser a única marcação de versão do documento. |
 | 0.5.0 | 2026-10-08 | 1. `BaseModel` deixa de herdar `SoftDeleteMixin`: inclui apenas `TimestampMixin` — soft delete passa a ser **opt-in**, com nota de uso na seção 4.2; o mixin continua definido em `mixins.py` e exportado por `__init__.py`. 2. Docstring do `BaseModel` ajustada para "timestamp de criação/atualização". Projeto de referência atualizado em conjunto (verificado com `manage.py check` e `makemigrations --check`). |
 | 0.4.0 | 2026-10-06 | 1. `requirements.txt` exportado **sem hashes** (`uv export --no-dev --no-hashes`) e `Dockerfile` instala com `pip install` simples (sem `--require-hashes`) — exceção intencional ao F-13; fixação de versões via `uv.lock`. 2. Removida a criação do script `docker-compose-dev.sh` e proibido criar *wrappers* do Docker Compose (Regra 2); FASE 3 usa `docker compose` direto. 3. Diretório `scripts/` só é criado no fluxo opcional de build local do Tailwind (passo 6 da seção 9). |
 | 0.3.0 | 2026-09-13 | Endurecimento com as mitigações da auditoria de segurança (F-01 a F-13); execução validada integralmente em diretório limpo. |
