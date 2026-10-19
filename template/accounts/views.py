@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import Permission
@@ -22,6 +23,15 @@ PERMISSION_VERBS = {'add': 'Adicionar', 'change': 'Alterar', 'delete': 'Excluir'
 class LoginView(auth_views.LoginView):
     # AuthenticationForm do projeto: bloqueia e-mail não verificado.
     authentication_form = AuthenticationForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # O LoginView do Django injeta site_name = get_current_site(): sem
+        # django.contrib.sites isso é o host da requisição (IP:porta), que
+        # sobrescreve o context processor da marca — a navbar só perderia
+        # o nome do site nesta página.
+        context['site_name'] = settings.SITE_NAME
+        return context
 
 
 class SignupView(CreateView):
@@ -79,6 +89,24 @@ class ActivationView(TemplateView):
             return User.objects.get(pk=force_str(urlsafe_base64_decode(uidb64)))
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             return None
+
+
+class PasswordResetConfirmView(auth_views.PasswordResetConfirmView):
+    """Concluir o reset também verifica o e-mail: provar a posse da caixa
+    pelo link do reset equivale à prova do link de ativação — fallback
+    quando esse falhou (expirou no timeout herdado do gerador, senha trocada
+    antes do clique, e-mail que não chegou). A troca de senha já invalida
+    tokens de ativação pendentes: a senha entra no hash (ver tokens.py).
+    """
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        user = form.user
+        if not user.email_verified or user.activation_email_failed:
+            user.email_verified = True
+            user.activation_email_failed = False
+            user.save(update_fields=['email_verified', 'activation_email_failed'])
+        return response
 
 
 class ProfileView(LoginRequiredMixin, TemplateView):

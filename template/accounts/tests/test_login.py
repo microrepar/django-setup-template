@@ -60,6 +60,15 @@ class LoginByEmailTestCase(TestCase):
 
         self.assertRedirects(response, reverse('home'))
 
+    def test_login_page_keeps_the_site_brand(self):
+        # o LoginView do Django injeta site_name = host da requisição (IP:porta
+        # sem django.contrib.sites), sobrescrevendo o context processor da
+        # marca: só a página de login exibia o endereço no lugar do nome
+        response = self.client.get(reverse('login'))
+
+        self.assertContains(response, settings.SITE_NAME)
+        self.assertNotContains(response, 'testserver')
+
     def test_home_shows_profile_button_to_common_user(self):
         # usuário comum logado tem ação real na home (perfil), sem botão de
         # admin que ele não pode usar e sem convite a entrar de novo
