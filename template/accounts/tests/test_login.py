@@ -1,3 +1,4 @@
+from axes.models import AccessAttempt
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -88,6 +89,17 @@ class BruteForceLockoutTestCase(TestCase):
         return self.client.post(
             reverse('login'), {'username': 'usuario@exemplo.com', 'password': password}, **extra
         )
+
+    def test_falha_grava_o_email_na_tentativa(self):
+        # o e-mail digitado viaja na chave interna "username" do
+        # AuthenticationForm; o padrão do axes 8 deriva o campo de
+        # User.USERNAME_FIELD ("email") e gravaria username NULL — o
+        # bloqueio cairia só no IP e o `axes_reset_username <e-mail>`
+        # nunca encontraria nada ("No attempts found")
+        self.post_login()
+
+        attempt = AccessAttempt.objects.get()
+        self.assertEqual(attempt.username, 'usuario@exemplo.com')
 
     def test_quinta_falha_bloqueia_proxima_tentativa(self):
         # antes do limite, as falhas exibem o erro normal do formulário...

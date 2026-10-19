@@ -177,6 +177,14 @@ AXES_LOGIN_URLS = [
 
 AXES_LOCKOUT_TEMPLATE = 'axes/errors/429.html'
 
+# O e-mail digitado no login viaja na chave interna "username" do
+# AuthenticationForm (o rótulo na tela é "E-mail", mas o campo é username).
+# O padrão do axes 8 deriva este nome de User.USERNAME_FIELD ("email") e,
+# sem esta sobrescrita, toda tentativa é gravada com username NULL: o
+# bloqueio cai só no IP e o `axes_reset_username <e-mail>` não encontra
+# nada ("No attempts found").
+AXES_USERNAME_FORM_FIELD = 'username'
+
 # O IP do cliente é resolvido por uma fonte única (get_client_ip em
 # shared.utils), consumida pelo axes via AXES_CLIENT_IP_CALLABLE.
 AXES_CLIENT_IP_CALLABLE = 'shared.utils.get_client_ip'
