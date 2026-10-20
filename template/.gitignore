@@ -184,6 +184,7 @@ node_modules/
 core/static/core/css/output.css
 .superuser-password
 .claude/
+.ai-jail
 
 # Template Copier: repo git próprio e independente (será extraído daqui).
 # Sem remote, trackear criaria um gitlink quebrado (meio-submódulo).

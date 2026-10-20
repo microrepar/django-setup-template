@@ -10,9 +10,13 @@ ENV LANG=pt_BR.UTF-8
 ENV LANGUAGE=pt_BR:pt
 ENV LC_ALL=pt_BR.UTF-8
 
-# Atualiza pacotes do sistema e instala o cliente do PostgreSQL e curl
+# Atualiza pacotes do sistema e instala o cliente do PostgreSQL, curl e locales;
+# gera pt_BR.UTF-8 para que os ENV de locale acima existam de fato (sem isso o
+# bash emite "setlocale: LC_ALL: cannot change locale" ao iniciar)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends postgresql-client curl && \
+    apt-get install -y --no-install-recommends postgresql-client curl locales && \
+    sed -i '/pt_BR.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Baixar Tailwind CSS CLI v4 para Linux e VERIFICAR a integridade (sha256 pinado)
