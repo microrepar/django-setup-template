@@ -1,3 +1,11 @@
+"""Modelos abstratos compartilhados.
+
+Modelo novo do projeto herda de BaseModel — nunca de models.Model direto:
+id UUID, created_at/updated_at e o helper update() vêm prontos. O User é a
+única exceção (AbstractUser, para o auth do Django). O contrato é imposto
+pelo teste shared/tests/test_models.py.
+"""
+
 from uuid import uuid4
 
 from django.db import models
@@ -34,4 +42,13 @@ class ActiveModel(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        abstract = True
+
+
+class BaseModel(TimeStampedModel, UUIDModel):
+    """Modelo abstrato herdado por todos os modelos do projeto, exceto o User."""
+
+    class Meta:
+        # Subclasse de modelo abstrato não é abstrata por herança: sem isto,
+        # o Django criaria uma tabela para o próprio BaseModel.
         abstract = True
